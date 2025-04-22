@@ -1,0 +1,134 @@
+<script type="module"></script>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Registrer oppmøte russedåp</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .result {
+            margin-top: 20px;
+        }
+        .result div {
+            margin-bottom: 10px;
+        }
+    </style>
+    <script src="config.js"></script>
+    <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getDatabase, ref, get, update } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+    // Initialiser Firebase
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+
+    const searchButton = document.getElementById('searchButton');
+    const visidInput = document.getElementById('visidInput');
+    const resultDiv = document.getElementById('result');
+
+    // Sett fokus til input-feltet når siden lastes
+    window.onload = () => {
+        visidInput.focus();
+    };
+
+    // Funksjon for å søke etter bruker
+    const searchUser = async () => {
+        const visid = visidInput.value.trim();
+        if (!visid) {
+            alert('Vennligst skriv inn en VISID.');
+            return;
+        }
+
+        try {
+            const dbRef = ref(database); // Endre til din databasebane
+            const snapshot = await get(dbRef);
+
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                let foundUser = null;
+                let userKey = null;
+
+                // Gå gjennom alle brukere i "test" og sjekk VISID
+                for (const key in data) {
+                    if (data[key].VISID == visid) {
+                        foundUser = { key, ...data[key] };
+                        userKey = key;
+                        break;
+                    }
+                }
+
+                // Tøm inputfeltet etter søk
+                visidInput.value = '';
+
+                if (foundUser) {
+                    const statusText = foundUser.Status ? "Registrert" : "Ikke registrert";
+                    resultDiv.innerHTML = `
+                        <div><strong>Fornavn:</strong> ${foundUser.Fornavn}</div>
+                        <div><strong>Etternavn:</strong> ${foundUser.Etternavn}</div>
+                        <div><strong>VISID:</strong> ${foundUser.VISID}</div>
+                        <div><strong>Status:</strong> <span id="status">${statusText}</span></div>
+                    `;
+
+                    if (foundUser.Status) {
+                        resultDiv.innerHTML += `<div style="color: red;">Brukeren er allerede registrert.</div>`;
+                    } else {
+                        resultDiv.innerHTML += `<button id="toggleStatusButton">Registrer</button>`;
+
+                        // Endre status-knapp
+                        document.getElementById('toggleStatusButton').addEventListener('click', async () => {
+                            const currentStatus = document.getElementById('status').textContent;
+                            if (currentStatus === "Registrert") {
+                                alert('Status kan ikke endres fra Registrert til Ikke registrert.');
+                                return;
+                            }
+                            const newStatus = true;
+                            try {
+                                await update(ref(database, `${userKey}`), { Status: newStatus });
+                                document.getElementById('status').textContent = "Registrert";
+                                document.getElementById('status').style.color = "green"; // Sett grønn tekst
+                                document.getElementById('toggleStatusButton').remove(); // Fjern knappen
+                                visidInput.focus(); // Sett fokus tilbake til inputboksen
+                            } catch (error) {
+                                console.error('Feil ved oppdatering av status:', error);
+                                alert('Kunne ikke oppdatere status. Prøv igjen.');
+                            }
+                        });
+                    }
+                } else {
+                    resultDiv.innerHTML = '<div>Ingen bruker funnet med denne VISID-en.</div>';
+                }
+            } else {
+                resultDiv.innerHTML = '<div>Databasen er tom.</div>';
+            }
+        } catch (error) {
+            console.error('Feil ved henting av data:', error);
+        }
+    };
+
+    // Legg til klikkhendelse for søkeknappen
+    searchButton.addEventListener('click', searchUser);
+
+    // Legg til keydown-hendelse for å lytte etter "Enter"-tasten
+    visidInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            searchUser();
+        }
+    });
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Register oppmøte</h1>
+        <input type="text" id="visidInput" placeholder="Skriv inn VISID">
+        <button id="searchButton">Søk</button>
+        <div class="result" id="result">
+            <!-- Resultater vises her -->
+        </div>
+    </div>
+</body>
+</html>
